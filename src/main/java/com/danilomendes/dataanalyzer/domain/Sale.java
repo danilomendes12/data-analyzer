@@ -6,4 +6,4 @@ public record Sale(
     Long id,
     List<SaleItem> items,
     String salesmanName
-) {}
+) implements DataRecord {}

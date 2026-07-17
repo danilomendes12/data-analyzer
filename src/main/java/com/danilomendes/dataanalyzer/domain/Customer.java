@@ -4,4 +4,4 @@ public record Customer(
     String name,
     String document,
     String businessSegment
-) {}
+) implements DataRecord {}

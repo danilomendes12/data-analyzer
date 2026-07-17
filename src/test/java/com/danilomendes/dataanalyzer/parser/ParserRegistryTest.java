@@ -1,6 +1,7 @@
 package com.danilomendes.dataanalyzer.parser;
 
 import com.danilomendes.dataanalyzer.domain.Customer;
+import com.danilomendes.dataanalyzer.domain.DataRecord;
 import com.danilomendes.dataanalyzer.domain.Sale;
 import com.danilomendes.dataanalyzer.domain.SaleItem;
 import com.danilomendes.dataanalyzer.domain.Seller;
@@ -25,7 +26,7 @@ class ParserRegistryTest {
 
     @ParameterizedTest
     @MethodSource("officialLines")
-    void parsesEveryOfficialLineToItsRecord(String line, Object expected) {
+    void parsesEveryOfficialLineToItsRecord(String line, DataRecord expected) {
         assertThat(registry.parse(line)).contains(expected);
     }
 

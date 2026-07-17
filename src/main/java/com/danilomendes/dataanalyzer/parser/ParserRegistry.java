@@ -1,5 +1,6 @@
 package com.danilomendes.dataanalyzer.parser;
 
+import com.danilomendes.dataanalyzer.domain.DataRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -15,10 +16,10 @@ public class ParserRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ParserRegistry.class);
 
-    private final Map<String, LineParser<?>> parsersByPrefix;
+    private final Map<String, LineParser<? extends DataRecord>> parsersByPrefix;
 
     // Novos tipos de registro entram como novos beans LineParser, sem alterar esta classe.
-    public ParserRegistry(List<LineParser<?>> parsers) {
+    public ParserRegistry(List<LineParser<? extends DataRecord>> parsers) {
         this.parsersByPrefix = parsers.stream().collect(Collectors.toUnmodifiableMap(
             LineParser::prefix,
             Function.identity(),
@@ -28,7 +29,7 @@ public class ParserRegistry {
         ));
     }
 
-    public Optional<Object> parse(String line) {
+    public Optional<DataRecord> parse(String line) {
         if (line == null || line.isBlank()) {
             log.warn("Skipping blank line");
             return Optional.empty();
@@ -39,12 +40,12 @@ public class ParserRegistry {
             return Optional.empty();
         }
         String prefix = line.substring(0, delimiterIndex);
-        LineParser<?> parser = parsersByPrefix.get(prefix);
+        LineParser<? extends DataRecord> parser = parsersByPrefix.get(prefix);
         if (parser == null) {
             log.warn("Skipping line with unknown prefix '{}': {}", prefix, line);
             return Optional.empty();
         }
-        // Optional<T> não é covariante; widening explícito para o tipo de retorno.
-        return parser.parse(line).map(Object.class::cast);
+        // Optional<T> não é covariante; widening explícito para Optional<DataRecord>.
+        return parser.parse(line).map(DataRecord.class::cast);
     }
 }

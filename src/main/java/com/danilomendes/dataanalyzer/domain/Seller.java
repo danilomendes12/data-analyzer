@@ -6,4 +6,4 @@ public record Seller(
     BigDecimal monthlyWage,
     String name,
     String document
-) {}
+) implements DataRecord {}
