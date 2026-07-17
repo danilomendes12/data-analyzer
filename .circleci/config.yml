@@ -29,6 +29,7 @@ jobs:
           path: target/surefire-reports
       - codecov/upload:
           files: target/site/jacoco/jacoco.xml
+          skip_validation: true
 
 workflows:
   build:
