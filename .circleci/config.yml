@@ -1,0 +1,36 @@
+version: 2.1
+
+orbs:
+  codecov: codecov/codecov@5
+
+jobs:
+  build:
+    docker:
+      - image: cimg/openjdk:17.0
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore Maven cache
+          keys:
+            - maven-{{ checksum "pom.xml" }}
+            - maven-
+      - run:
+          name: Download dependencies
+          command: mvn -B dependency:go-offline
+      - save_cache:
+          name: Save Maven cache
+          key: maven-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+      - run:
+          name: Build and test
+          command: mvn -B verify
+      - store_test_results:
+          path: target/surefire-reports
+      - codecov/upload:
+          files: target/site/jacoco/jacoco.xml
+
+workflows:
+  build:
+    jobs:
+      - build
