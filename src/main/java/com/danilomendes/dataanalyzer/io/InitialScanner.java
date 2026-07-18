@@ -19,14 +19,16 @@ import java.util.stream.Stream;
 public class InitialScanner {
 
     private static final Logger log = LoggerFactory.getLogger(InitialScanner.class);
-    private static final String DAT_SUFFIX = ".dat";
 
     private final AppProperties properties;
+    private final OutputPathResolver outputPathResolver;
     private final ProcessedFileChecker checker;
     private final FileTaskSubmitter submitter;
 
-    public InitialScanner(AppProperties properties, ProcessedFileChecker checker, FileTaskSubmitter submitter) {
+    public InitialScanner(AppProperties properties, OutputPathResolver outputPathResolver,
+                          ProcessedFileChecker checker, FileTaskSubmitter submitter) {
         this.properties = properties;
+        this.outputPathResolver = outputPathResolver;
         this.checker = checker;
         this.submitter = submitter;
     }
@@ -34,16 +36,11 @@ public class InitialScanner {
     public void scan() {
         Path inputDir = properties.inputDir();
         try (Stream<Path> files = Files.list(inputDir)) {
-            files.filter(Files::isRegularFile)
-                .filter(InitialScanner::isDatFile)
+            files.filter(outputPathResolver::isInputFile)
                 .filter(path -> !checker.isProcessed(path))
                 .forEach(submitter::submit);
         } catch (IOException e) {
             log.error("Falha ao varrer o diretório de entrada {}", inputDir, e);
         }
-    }
-
-    private static boolean isDatFile(Path path) {
-        return path.getFileName().toString().endsWith(DAT_SUFFIX);
     }
 }

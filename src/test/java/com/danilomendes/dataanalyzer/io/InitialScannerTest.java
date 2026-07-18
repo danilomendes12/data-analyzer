@@ -27,8 +27,9 @@ class InitialScannerTest {
     @BeforeEach
     void setUp() {
         AppProperties properties = new AppProperties(inputDir, outputDir);
+        OutputPathResolver resolver = new OutputPathResolver(properties);
         submitter = mock(FileTaskSubmitter.class);
-        scanner = new InitialScanner(properties, new ProcessedFileChecker(new OutputPathResolver(properties)), submitter);
+        scanner = new InitialScanner(properties, resolver, new ProcessedFileChecker(resolver), submitter);
     }
 
     @Test

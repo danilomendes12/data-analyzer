@@ -3,13 +3,16 @@ package com.danilomendes.dataanalyzer.io;
 import com.danilomendes.dataanalyzer.config.AppProperties;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Fonte única da regra "arquivo de entrada → arquivo de saída". Vive num componente próprio (e não
- * dentro do writer) porque tanto o {@link ReportWriter} quanto o {@link ProcessedFileChecker} dependem
- * dela: se cada um tivesse sua própria cópia, o mecanismo de skip da varredura quebraria em silêncio
- * assim que as duas divergissem.
+ * Fonte única da convenção de nomes de arquivo: reconhece um {@code .dat} de entrada e resolve o seu
+ * {@code .done.dat} de saída. Vive num componente próprio (e não dentro do writer) porque tanto o
+ * {@link ReportWriter} quanto o {@link ProcessedFileChecker} dependem da regra de nome de saída; e o
+ * literal {@code ".dat"} de entrada mora aqui, num lugar só, para o watcher e a varredura reconhecerem
+ * entrada pelo mesmo critério (se cada um tivesse sua cópia, o mecanismo de skip quebraria em silêncio
+ * no dia em que divergissem).
  */
 @Component
 public class OutputPathResolver {
@@ -21,6 +24,12 @@ public class OutputPathResolver {
 
     public OutputPathResolver(AppProperties properties) {
         this.outputDir = properties.outputDir();
+    }
+
+    // Critério único de "é um arquivo de entrada": arquivo regular (não diretório/symlink de pasta) com
+    // extensão .dat. Compartilhado pela varredura inicial e pelo loop de eventos do watcher.
+    public boolean isInputFile(Path path) {
+        return Files.isRegularFile(path) && path.getFileName().toString().endsWith(INPUT_SUFFIX);
     }
 
     // vendas.dat -> <out>/vendas.done.dat: troca a extensão em vez de concatenar (evita vendas.dat.done.dat).

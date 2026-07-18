@@ -31,24 +31,26 @@ import java.nio.file.WatchService;
 public class DirectoryWatcher implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DirectoryWatcher.class);
-    private static final String DAT_SUFFIX = ".dat";
     private static final long JOIN_TIMEOUT_MILLIS = 5_000;
 
     private final AppProperties properties;
     private final InitialScanner initialScanner;
     private final ProcessedFileChecker checker;
     private final FileTaskSubmitter submitter;
+    private final OutputPathResolver outputPathResolver;
 
     private volatile boolean running;
     private WatchService watchService;
     private Thread watchThread;
 
     public DirectoryWatcher(AppProperties properties, InitialScanner initialScanner,
-                            ProcessedFileChecker checker, FileTaskSubmitter submitter) {
+                            ProcessedFileChecker checker, FileTaskSubmitter submitter,
+                            OutputPathResolver outputPathResolver) {
         this.properties = properties;
         this.initialScanner = initialScanner;
         this.checker = checker;
         this.submitter = submitter;
+        this.outputPathResolver = outputPathResolver;
     }
 
     @Override
@@ -77,12 +79,23 @@ public class DirectoryWatcher implements ApplicationRunner {
             WatchKey key;
             try {
                 key = watchService.take();
-            } catch (ClosedWatchServiceException | InterruptedException e) {
+            } catch (ClosedWatchServiceException e) {
+                // Fechamento normal: stop() fecha o WatchService no shutdown, o take() lança e o loop encerra.
+                return;
+            } catch (InterruptedException e) {
+                // Interrupção externa: propaga o status e sai. Só aqui re-interrompemos a thread.
                 Thread.currentThread().interrupt();
                 return;
             }
             for (WatchEvent<?> event : key.pollEvents()) {
-                handleEvent(event);
+                try {
+                    handleEvent(event);
+                } catch (RuntimeException e) {
+                    // Blindagem do loop: nenhuma exceção inesperada no tratamento de um evento (ex.:
+                    // RejectedExecutionException ao submeter durante o shutdown) pode derrubar a thread
+                    // dir-watcher — não-daemon, é a razão de o JVM seguir vivo.
+                    log.error("Falha ao tratar evento de watch {}", event.context(), e);
+                }
             }
             if (!key.reset()) {
                 log.warn("WatchKey inválida para {}; encerrando o loop de eventos", properties.inputDir());
@@ -91,7 +104,8 @@ public class DirectoryWatcher implements ApplicationRunner {
         }
     }
 
-    private void handleEvent(WatchEvent<?> event) {
+    // Package-private para permitir teste direto do despacho de eventos (OVERFLOW → varredura; filtro de entrada).
+    void handleEvent(WatchEvent<?> event) {
         if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
             log.warn("Watch OVERFLOW: eventos podem ter sido perdidos, reexecutando a varredura completa");
             initialScanner.scan();
@@ -99,8 +113,9 @@ public class DirectoryWatcher implements ApplicationRunner {
         }
         Path name = (Path) event.context();
         Path path = properties.inputDir().resolve(name);
-        // Filtro fino: só .dat e só o que ainda não foi processado (ignora ENTRY_MODIFY tardio de arquivo pronto).
-        if (path.getFileName().toString().endsWith(DAT_SUFFIX) && !checker.isProcessed(path)) {
+        // Filtro fino: só arquivo de entrada (.dat regular) e só o que ainda não foi processado
+        // (ignora ENTRY_MODIFY tardio de arquivo já pronto).
+        if (outputPathResolver.isInputFile(path) && !checker.isProcessed(path)) {
             submitter.submit(path);
         }
     }
