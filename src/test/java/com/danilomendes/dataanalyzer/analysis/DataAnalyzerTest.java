@@ -119,19 +119,19 @@ class DataAnalyzerTest {
     }
 
     @Test
-    void sumsItemValuesWithBigDecimalPrecision() {
-        // 3 × 0.10 = 0.30 exato; ponto flutuante daria 0.30000000000000004.
+    void mostExpensiveTieProvesBigDecimalSumAndNotDouble() {
+        // Venda 9 = 3 × 0.10; venda 2 = 1 × 0.30. Em BigDecimal ambas valem exatamente 0.30 → empate
+        // resolvido pelo menor ID (2 vence). Em double, 3 × 0.10 = 0.30000000000000004 > 0.30 e a
+        // venda 9 venceria — este teste falharia, o que o torna discriminante do uso de BigDecimal.
         feed(
             seller("Pedro", "111"),
-            sale(1, "Pedro",
-                new SaleItem(1L, 3, new BigDecimal("0.10")),
-                new SaleItem(2L, 1, new BigDecimal("0.20")))
+            sale(9, "Pedro", new SaleItem(1L, 3, new BigDecimal("0.10"))),
+            sale(2, "Pedro", new SaleItem(1L, 1, new BigDecimal("0.30")))
         );
 
         Report report = analyzer.summarize();
 
-        assertThat(report.mostExpensiveSaleId()).contains(1L);
-        assertThat(report.worstSellerName()).contains("Pedro");
+        assertThat(report.mostExpensiveSaleId()).contains(2L);
     }
 
     @Test

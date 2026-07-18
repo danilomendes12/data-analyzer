@@ -27,6 +27,12 @@ Assumidas nesta fase, sujeitas a confirmação com o avaliador:
 - **Desempates** (determinísticos e independentes da ordem de leitura): venda mais cara → menor ID;
   pior vendedor → menor nome (ordem alfabética).
 - **Dataset vazio** → contagens zero e `Optional.empty()` para venda mais cara e pior vendedor.
+- **ID de venda é numérico** (`Long`): `08` e `8` são a mesma venda; zeros à esquerda **não** são preservados
+  na saída. Alternativa descartada: manter o ID como `String` para preservar a grafia original — rejeitada porque
+  o desempate da venda mais cara é numérico (`8 < 10`) e um ID textual exigiria conversões espalhadas.
+- **Vínculo venda → vendedor é por nome** (o registro `003` referencia o vendedor pelo nome, não pelo CPF).
+  Consequência assumida do formato: vendedores homônimos têm seus volumes somados como se fossem um só.
+  É uma limitação do formato de entrada, não uma escolha — não há chave melhor disponível na linha de venda.
 
 ## Decisões de arquitetura
 
