@@ -52,6 +52,44 @@ Assumidas nesta fase, sujeitas a confirmação com o avaliador:
 - **`Optional` nos campos derivados do `Report`:** venda mais cara e pior vendedor podem legitimamente não existir
   (sem vendas / sem vendedores cadastrados); as contagens são sempre definidas, logo primitivas `long`.
 
+### I/O e orquestração (Fase 3)
+
+- **Nomes de saída — fonte única (`OutputPathResolver`):** `vendas.dat` vira `<out>/vendas.done.dat` (troca a
+  extensão, não concatena `vendas.dat.done.dat`). A regra vive num componente próprio porque o `ReportWriter` (escreve)
+  e o `ProcessedFileChecker` (decide se já foi processado) dependem dela; se cada um tivesse sua cópia, o mecanismo de
+  skip quebraria em silêncio no dia em que divergissem.
+- **`N/A` para dado derivado ausente:** arquivo sem vendas e/ou sem vendedores `001` imprime `N/A` no campo
+  correspondente, preservando o formato fixo de 4 linhas do enunciado. Alternativa descartada: omitir a linha —
+  quebraria o formato.
+- **Escrita atômica:** o relatório é gravado num `.tmp` **no mesmo diretório de saída** e movido com `ATOMIC_MOVE`;
+  se o sistema de arquivos não suportar, capturamos `AtomicMoveNotSupportedException` e caímos para um move simples
+  com log. Racional: um `.done.dat` truncado por crash seria lido como "já processado" pela varredura de subida —
+  a atomicidade protege o mecanismo de skip. O `.tmp` residual de uma falha é limpo no `finally`.
+- **Predicado único de "já processado":** um arquivo está processado sse seu `.done.dat` existe. O mesmo
+  `ProcessedFileChecker` é usado pela varredura de subida (Opção B) e pelo watcher antes de submeter — assim um
+  `ENTRY_MODIFY` tardio de um arquivo já pronto é ignorado (coerente com "entrada imutável").
+- **Corrida subida × watcher:** na subida o `WatchService` é registrado **antes** da varredura inicial. Um arquivo
+  que caia entre os dois passos gera evento e não se perde; a deduplicação impede que ele seja processado duas vezes.
+- **Deduplicação em voo:** submissões passam por um `ConcurrentHashMap.newKeySet()` de caminhos normalizados; um path
+  só é submetido se `add` retornar `true`, e é removido no `finally` da tarefa. Cobre tanto varredura × evento quanto
+  vários `ENTRY_MODIFY` do mesmo arquivo.
+- **Tamanho estável (arquivo ainda em escrita):** antes de processar, esperamos duas leituras consecutivas de tamanho
+  iguais (até 5 tentativas × 200 ms ≈ 800 ms). Ao estourar, `log.error` e desistência — o arquivo é recuperado na
+  próxima subida pela própria varredura. A checagem roda **dentro da tarefa do pool** (não no loop de eventos): mantém
+  o loop fino e não bloqueante, e cobre também um arquivo sendo copiado no exato momento do boot (visto pela varredura).
+- **`OVERFLOW`:** `log.warn` + reexecução da varredura da Opção B — nenhum mecanismo novo.
+- **Pool e loop:** pool fixo de `Runtime.getRuntime().availableProcessors()` threads com `ThreadFactory` nomeando as
+  threads (`file-processor-N`, facilita ler logs concorrentes); fila ilimitada de propósito, já que cada tarefa carrega
+  só um `Path`. O loop de eventos é fino, delegando a colaboradores testáveis (checker, varredura, submitter).
+- **Bootstrap com `ApplicationRunner` + `@PreDestroy` (em vez de `SmartLifecycle`):** escolha por simplicidade
+  (critério do desafio). O desligamento ordenado ainda sai de graça pela ordem de destruição de beans — o watcher
+  depende do submitter, então é destruído primeiro (para de aceitar eventos) e só então o pool é drenado
+  (`shutdown` + `awaitTermination`).
+- **Thread do watch loop é não-daemon:** de propósito. Sendo um app não-web, sem uma thread não-daemon o JVM
+  encerraria assim que `main()` retornasse e o watcher morreria logo após subir. A thread do loop é a razão de a
+  aplicação continuar viva; no shutdown, fechar o `WatchService` faz o `take()` lançar e a thread termina, liberando
+  o JVM. (As threads do pool seguem daemon; são drenadas pelo `@PreDestroy` do submitter.)
+
 ## Uso de IA
 
 _Em construção._
