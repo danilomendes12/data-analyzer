@@ -12,7 +12,19 @@ _Em construção._
 
 ## Como rodar os testes
 
-_Em construção._
+```
+mvn verify
+```
+
+Compila, roda a suíte de testes e falha se a cobertura de linhas cair abaixo de 80% (gate do JaCoCo).
+
+Requer **JDK 21**: o JaCoCo 0.8.13 ainda não gera o relatório de cobertura sob o JDK 26, então o
+`verify` quebra nessa versão. Se o seu `mvn` estiver apontado para outra JVM (o Maven do Homebrew, por
+exemplo, traz a 26 como runtime), force a 21 na invocação:
+
+```
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn verify
+```
 
 ## Regras de negócio (Fase 2 — Análise)
 
@@ -54,10 +66,12 @@ Assumidas nesta fase, sujeitas a confirmação com o avaliador:
 
 ### I/O e orquestração (Fase 3)
 
-- **Nomes de saída — fonte única (`OutputPathResolver`):** `vendas.dat` vira `<out>/vendas.done.dat` (troca a
+- **Convenção de nomes — fonte única (`OutputPathResolver`):** `vendas.dat` vira `<out>/vendas.done.dat` (troca a
   extensão, não concatena `vendas.dat.done.dat`). A regra vive num componente próprio porque o `ReportWriter` (escreve)
   e o `ProcessedFileChecker` (decide se já foi processado) dependem dela; se cada um tivesse sua cópia, o mecanismo de
-  skip quebraria em silêncio no dia em que divergissem.
+  skip quebraria em silêncio no dia em que divergissem. O mesmo componente é o único lugar do literal `.dat` de
+  entrada (`isInputFile`: arquivo regular com extensão `.dat`), usado tanto pela varredura de subida quanto pelo loop
+  de eventos do watcher — os dois reconhecem "arquivo de entrada" pelo mesmo critério.
 - **`N/A` para dado derivado ausente:** arquivo sem vendas e/ou sem vendedores `001` imprime `N/A` no campo
   correspondente, preservando o formato fixo de 4 linhas do enunciado. Alternativa descartada: omitir a linha —
   quebraria o formato.
@@ -87,8 +101,36 @@ Assumidas nesta fase, sujeitas a confirmação com o avaliador:
   (`shutdown` + `awaitTermination`).
 - **Thread do watch loop é não-daemon:** de propósito. Sendo um app não-web, sem uma thread não-daemon o JVM
   encerraria assim que `main()` retornasse e o watcher morreria logo após subir. A thread do loop é a razão de a
-  aplicação continuar viva; no shutdown, fechar o `WatchService` faz o `take()` lançar e a thread termina, liberando
-  o JVM. (As threads do pool seguem daemon; são drenadas pelo `@PreDestroy` do submitter.)
+  aplicação continuar viva; no shutdown, fechar o `WatchService` faz o `take()` lançar `ClosedWatchServiceException`
+  (fechamento normal, sem re-interromper a thread) e o loop encerra, liberando o JVM. (As threads do pool seguem
+  daemon; são drenadas pelo `@PreDestroy` do submitter.) Como essa thread é a que mantém o JVM vivo, o tratamento de
+  cada evento é blindado por um `try/catch (RuntimeException)`: uma exceção inesperada (ex.: `RejectedExecutionException`
+  ao submeter durante o shutdown) é logada e não derruba o loop.
+
+### Estratégia de testes (Fase 4)
+
+- **Recursos `.dat` em vez de listas inline:** os dados dos testes de integração vêm de arquivos em
+  `src/test/resources` (`dados-teste.dat` — o exemplo do enunciado —, `dados-com-linhas-invalidas.dat`,
+  `outro-dataset.dat`), no mesmo formato de entrada. O teste passa a exercitar o parsing do arquivo real (incluindo o
+  delimitador `ç` em UTF-8), não uma lista de strings montada no próprio teste.
+- **Robustez a linhas malformadas:** um `.dat` com prefixo desconhecido, item de número inválido e linha em branco
+  intercalados às linhas válidas produz **o mesmo relatório** do arquivo limpo — prova de que a passada única descarta
+  o inválido sem contaminar o agregado.
+- **Concorrência com isolamento:** dois arquivos soltos juntos, com relatórios distintos, validam o pool concorrente e
+  o fato de cada arquivo ter o seu próprio `DataAnalyzer` (sem contaminação cruzada).
+- **Contexto isolado por classe (`@DirtiesContext(AFTER_CLASS)`):** cada classe `@SpringBootTest` monitora os seus
+  próprios diretórios temporários. Sem isolar, o cache de contexto do Spring reaproveitaria o contexto de outra classe
+  e os testes que semeiam arquivos ANTES do boot passariam a monitorar o diretório errado. Marcar o contexto como sujo
+  ao fim da classe ainda exercita o desligamento ordenado (`@PreDestroy`).
+- **Varredura de subida e skip semeados no `@DynamicPropertySource`:** o arquivo (e, no teste de skip, o `.done.dat`
+  pré-existente) é criado no bloco estático, antes de o contexto subir — o único ponto garantidamente anterior ao boot.
+  O teste de skip valida que conteúdo e `lastModified` da saída não mudam numa janela de espera; se houvesse
+  reprocessamento, o sentinela seria sobrescrito.
+- **OVERFLOW e filtro em teste de unidade:** `handleEvent` é package-private para que o despacho de eventos seja
+  verificável com um `WatchEvent` stub, sem `WatchService` real — OVERFLOW dispara nova varredura, e evento de
+  não-`.dat` ou de arquivo já processado não submete nada.
+- **`ApplicationStartupTest` removido:** o `contextLoads()` virou redundante — as classes de integração sobem o
+  contexto completo, então uma falha de subida quebraria todas elas.
 
 ## Uso de IA
 
