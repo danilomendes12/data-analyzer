@@ -15,18 +15,21 @@ jobs:
             - maven-{{ checksum "pom.xml" }}
             - maven-
       - run:
-          name: Download dependencies
-          command: mvn -B dependency:go-offline
+          name: Build
+          command: mvn -B -DskipTests compile
+      - run:
+          name: Testes
+          command: mvn -B test
+      - store_test_results:
+          path: target/surefire-reports
+      - run:
+          name: Relatório de cobertura (JaCoCo)
+          command: mvn -B -DskipTests verify
       - save_cache:
           name: Save Maven cache
           key: maven-{{ checksum "pom.xml" }}
           paths:
             - ~/.m2
-      - run:
-          name: Build and test
-          command: mvn -B verify
-      - store_test_results:
-          path: target/surefire-reports
       - codecov/upload:
           files: target/site/jacoco/jacoco.xml
 
