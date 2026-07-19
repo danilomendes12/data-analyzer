@@ -8,13 +8,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Comparator;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -48,12 +44,12 @@ class DirectoryWatchingIntegrationTest {
 
     @AfterAll
     static void cleanUp() throws IOException {
-        deleteRecursively(baseDir);
+        IntegrationTestFiles.deleteRecursively(baseDir);
     }
 
     @Test
-    void generatesDoneFileForOfficialExample() throws IOException {
-        copyResourceToInput("dados-teste.dat", "vendas.dat");
+    void generatesDoneFileForOfficialExample() {
+        IntegrationTestFiles.copyResource("dados-teste.dat", inputDir.resolve("vendas.dat"));
 
         assertReportEventually("vendas.done.dat",
             "Quantidade de clientes: 2",
@@ -63,10 +59,10 @@ class DirectoryWatchingIntegrationTest {
     }
 
     @Test
-    void ignoresMalformedLinesButProcessesValidOnes() throws IOException {
+    void ignoresMalformedLinesButProcessesValidOnes() {
         // Mesmo dataset válido do exemplo oficial, mas com linhas malformadas (prefixo desconhecido, item
         // com número inválido, linha em branco) intercaladas. O relatório deve ser idêntico ao caso limpo.
-        copyResourceToInput("dados-com-linhas-invalidas.dat", "sujo.dat");
+        IntegrationTestFiles.copyResource("dados-com-linhas-invalidas.dat", inputDir.resolve("sujo.dat"));
 
         assertReportEventually("sujo.done.dat",
             "Quantidade de clientes: 2",
@@ -76,11 +72,11 @@ class DirectoryWatchingIntegrationTest {
     }
 
     @Test
-    void processesTwoFilesDroppedConcurrently() throws IOException {
+    void processesTwoFilesDroppedConcurrently() {
         // Dois arquivos soltos juntos, com relatórios distintos: valida a concorrência básica do pool e o
         // isolamento por arquivo (cada um tem seu próprio DataAnalyzer; não pode haver contaminação cruzada).
-        copyResourceToInput("dados-teste.dat", "a.dat");
-        copyResourceToInput("outro-dataset.dat", "b.dat");
+        IntegrationTestFiles.copyResource("dados-teste.dat", inputDir.resolve("a.dat"));
+        IntegrationTestFiles.copyResource("outro-dataset.dat", inputDir.resolve("b.dat"));
 
         assertReportEventually("a.done.dat",
             "Quantidade de clientes: 2",
@@ -97,43 +93,6 @@ class DirectoryWatchingIntegrationTest {
     private void assertReportEventually(String doneFileName, String... expectedLines) {
         Path done = outputDir.resolve(doneFileName);
         await().atMost(Duration.ofSeconds(10)).until(() -> Files.exists(done));
-        assertThat(readLines(done)).containsExactly(expectedLines);
-    }
-
-    private static void copyResourceToInput(String resource, String targetName) throws IOException {
-        try (InputStream in = resourceStream(resource)) {
-            Files.copy(in, inputDir.resolve(targetName));
-        }
-    }
-
-    private static InputStream resourceStream(String resource) {
-        InputStream in = DirectoryWatchingIntegrationTest.class.getClassLoader().getResourceAsStream(resource);
-        if (in == null) {
-            throw new IllegalStateException("Recurso de teste não encontrado no classpath: " + resource);
-        }
-        return in;
-    }
-
-    private static java.util.List<String> readLines(Path path) {
-        try {
-            return Files.readAllLines(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new java.io.UncheckedIOException(e);
-        }
-    }
-
-    static void deleteRecursively(Path root) throws IOException {
-        if (root == null) {
-            return;
-        }
-        try (Stream<Path> paths = Files.walk(root)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ignored) {
-                    // Melhor esforço: o watcher pode ainda segurar o diretório neste ponto.
-                }
-            });
-        }
+        assertThat(IntegrationTestFiles.readLines(done)).containsExactly(expectedLines);
     }
 }

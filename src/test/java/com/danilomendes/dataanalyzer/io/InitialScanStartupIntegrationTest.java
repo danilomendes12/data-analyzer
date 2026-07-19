@@ -8,8 +8,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -41,17 +39,14 @@ class InitialScanStartupIntegrationTest {
         outputDir = baseDir.resolve("out");
         Files.createDirectories(inputDir);
         // Semeia o arquivo ANTES do boot: é isto que a varredura de subida precisa encontrar.
-        try (InputStream in = InitialScanStartupIntegrationTest.class.getClassLoader()
-                .getResourceAsStream("dados-teste.dat")) {
-            Files.copy(in, inputDir.resolve("pre-existente.dat"));
-        }
+        IntegrationTestFiles.copyResource("dados-teste.dat", inputDir.resolve("pre-existente.dat"));
         registry.add("app.input-dir", inputDir::toString);
         registry.add("app.output-dir", outputDir::toString);
     }
 
     @AfterAll
     static void cleanUp() throws IOException {
-        DirectoryWatchingIntegrationTest.deleteRecursively(baseDir);
+        IntegrationTestFiles.deleteRecursively(baseDir);
     }
 
     @Test
@@ -59,18 +54,10 @@ class InitialScanStartupIntegrationTest {
         Path done = outputDir.resolve("pre-existente.done.dat");
         await().atMost(Duration.ofSeconds(10)).until(() -> Files.exists(done));
 
-        assertThat(readLines(done)).containsExactly(
+        assertThat(IntegrationTestFiles.readLines(done)).containsExactly(
             "Quantidade de clientes: 2",
             "Quantidade de vendedores: 2",
             "ID da venda mais cara: 10",
             "Pior vendedor (menor volume de vendas): Paulo");
-    }
-
-    private static java.util.List<String> readLines(Path path) {
-        try {
-            return Files.readAllLines(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new java.io.UncheckedIOException(e);
-        }
     }
 }

@@ -8,7 +8,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,10 +44,7 @@ class SkipAlreadyProcessedIntegrationTest {
         Files.createDirectories(inputDir);
         Files.createDirectories(outputDir);
         // Entrada presente...
-        try (InputStream in = SkipAlreadyProcessedIntegrationTest.class.getClassLoader()
-                .getResourceAsStream("dados-teste.dat")) {
-            Files.copy(in, inputDir.resolve("vendas.dat"));
-        }
+        IntegrationTestFiles.copyResource("dados-teste.dat", inputDir.resolve("vendas.dat"));
         // ...e o .done.dat correspondente já na saída, com conteúdo sentinela.
         Files.writeString(outputDir.resolve("vendas.done.dat"), SENTINEL, StandardCharsets.UTF_8);
         registry.add("app.input-dir", inputDir::toString);
@@ -57,7 +53,7 @@ class SkipAlreadyProcessedIntegrationTest {
 
     @AfterAll
     static void cleanUp() throws IOException {
-        DirectoryWatchingIntegrationTest.deleteRecursively(baseDir);
+        IntegrationTestFiles.deleteRecursively(baseDir);
     }
 
     @Test
