@@ -14,7 +14,6 @@ Requer **JDK 17+** (validado em 17 e 21) e Maven.
 mvn clean package
 java -jar target/data-analyzer-0.0.1-SNAPSHOT.jar
 ```
-
 Sem nenhuma configuração adicional a aplicação usa os diretórios padrão, criados de forma idempotente na
 subida:
 
@@ -56,14 +55,24 @@ Compila, roda a suíte de testes e falha se a cobertura de linhas cair abaixo de
 
 ## Decisões de arquitetura
 
+![Diagrama de arquitetura: fluxo de um `.dat` da entrada à saída, com os componentes coloridos por pacote (io, parser, analysis, domain, config).](docs/arquitetura.png)
+
 ### Estrutura de pacotes
 
-Os pacotes espelham as responsabilidades do fluxo, não os tipos técnicos: `domain` (os registros do
-formato de entrada), `parser` (linha de texto → registro), `analysis` (agregação em passada única) e `io`
-(monitoramento do diretório, orquestração do pool e escrita atômica), com `config` só para as
-propriedades. A dependência flui numa direção — `io` conhece `analysis`/`parser`/`domain`, mas o
-`domain` não conhece ninguém — o que mantém o núcleo de regra de negócio (parsing + análise) testável sem
-tocar em I/O ou em Spring.
+**Organização por camada técnica** (`domain`, `parser`, `analysis`, `io`, `config`) — e não por feature.
+A escolha é deliberada: com um único fluxo de negócio (arquivo → relatório) não há features paralelas para
+isolar, então um recorte por feature criaria pacotes de um componente só e esconderia justamente o que
+importa aqui — as fronteiras entre camadas. Cada pacote agrupa uma responsabilidade do fluxo: `domain` (os
+registros do formato de entrada), `parser` (linha de texto → registro), `analysis` (agregação em passada
+única), `io` (monitoramento do diretório, orquestração do pool e escrita atômica) e `config` só para as
+propriedades. Para o tamanho do projeto, cinco pacotes coesos são o suficiente para dar nome às fronteiras
+sem virar cerimônia.
+
+**A dependência aponta para dentro**, em direção ao domínio: `io → analysis → domain` e
+`io → parser → domain`. O `domain` não conhece ninguém; `parser` e `analysis` não conhecem `io` nem Spring.
+Isso mantém o núcleo de regra de negócio (parsing + análise) puro e testável em isolamento — os testes de
+`parser`/`analysis` rodam sem `WatchService`, sem pool e sem contexto Spring — e concentra todo o
+acoplamento a framework e a I/O numa única camada de borda (`io` + `config`).
 
 ### Spring mínimo — e o que aconteceria sem ele
 
