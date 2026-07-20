@@ -24,9 +24,6 @@ jobs:
           path: target/surefire-reports
       - run:
           name: Relatório de cobertura (JaCoCo)
-          # Goals diretos sobre o jacoco.exec do passo "Testes" — sem recompilar/repackage.
-          # A sintaxe @<id> executa cada goal com a configuração da execução homônima do pom
-          # (report + regra de 80% do check).
           command: mvn -B jacoco:report@report jacoco:check@check
       - save_cache:
           name: Save Maven cache
