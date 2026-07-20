@@ -39,7 +39,6 @@ public class SaleLineParser implements LineParser<Sale> {
         }
     }
 
-    // Itens no formato [ID-Qtd-Preço,...]; qualquer item inválido descarta a venda inteira.
     private Optional<List<SaleItem>> parseItems(String rawItems, String line) {
         if (rawItems.length() < 2 || !rawItems.startsWith("[") || !rawItems.endsWith("]")) {
             log.warn("Skipping sale line with broken item brackets: {}", line);

@@ -36,7 +36,6 @@ public class ReportWriter {
             Files.writeString(tmp, format(report), StandardCharsets.UTF_8);
             moveIntoPlace(tmp, destination);
         } finally {
-            // No caminho feliz o move já consumiu o tmp; aqui só limpamos o resíduo de uma falha.
             Files.deleteIfExists(tmp);
         }
     }

@@ -13,9 +13,8 @@ import java.nio.file.Path;
 import java.util.stream.Stream;
 
 /**
- * Processa um arquivo em passada única: lê em UTF-8, agrega as linhas válidas num {@link DataAnalyzer}
- * novo (barato e puro — instanciado direto, não mockado) e delega a escrita ao {@link ReportWriter}.
- * Qualquer falha em um arquivo é logada e contida: nunca propaga, para não derrubar a thread do pool.
+ * Processa um arquivo em passada única, com um {@link DataAnalyzer} novo por arquivo (estado isolado).
+ * Qualquer falha é logada e contida — nunca propaga, para não derrubar a thread do pool.
  */
 @Component
 public class FileProcessor {
@@ -39,7 +38,6 @@ public class FileProcessor {
         } catch (IOException e) {
             log.error("Falha de I/O ao processar {}", path, e);
         } catch (RuntimeException e) {
-            // Cobre também UncheckedIOException lançada tardiamente pelo Files.lines durante o stream.
             log.error("Erro inesperado ao processar {}", path, e);
         }
     }

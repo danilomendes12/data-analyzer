@@ -30,7 +30,6 @@ public class DataAnalyzer {
     private Long mostExpensiveSaleId;
     private BigDecimal mostExpensiveSaleValue;
 
-    // instanceof com pattern (final no Java 17); switch de padrões só é final no Java 21.
     public void accept(DataRecord record) {
         if (record instanceof Seller seller) {
             sellerDocuments.add(seller.document());

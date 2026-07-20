@@ -26,8 +26,6 @@ public class OutputPathResolver {
         this.outputDir = properties.outputDir();
     }
 
-    // Critério único de "é um arquivo de entrada": arquivo regular (não diretório/symlink de pasta) com
-    // extensão .dat. Compartilhado pela varredura inicial e pelo loop de eventos do watcher.
     public boolean isInputFile(Path path) {
         return Files.isRegularFile(path) && path.getFileName().toString().endsWith(INPUT_SUFFIX);
     }

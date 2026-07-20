@@ -15,13 +15,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Ponto único de submissão de arquivos ao pool, com deduplicação em voo. A varredura inicial e o watcher
- * chamam {@link #submit(Path)}; o {@code ConcurrentHashMap.newKeySet()} garante que um mesmo arquivo
- * (visto pela varredura e por um evento, ou por vários {@code ENTRY_MODIFY}) seja processado uma vez só.
- *
- * <p>A checagem de estabilidade roda aqui, dentro da tarefa (e não no loop de eventos), por dois motivos:
- * mantém o loop fino e não bloqueante, e cobre também a varredura de subida — um arquivo sendo copiado no
- * exato momento do boot não é meio-processado.
+ * Ponto único de submissão ao pool, com deduplicação em voo: um {@code ConcurrentHashMap.newKeySet()}
+ * garante que o mesmo arquivo (visto pela varredura e por um evento, ou por vários {@code ENTRY_MODIFY})
+ * seja processado uma vez só. A checagem de estabilidade roda dentro da tarefa (não no loop de eventos):
+ * mantém o loop fino e cobre também um arquivo sendo copiado no exato momento do boot.
  */
 @Component
 public class FileTaskSubmitter {

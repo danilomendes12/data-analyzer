@@ -18,7 +18,6 @@ public class ParserRegistry {
 
     private final Map<String, LineParser<? extends DataRecord>> parsersByPrefix;
 
-    // Novos tipos de registro entram como novos beans LineParser, sem alterar esta classe.
     public ParserRegistry(List<LineParser<? extends DataRecord>> parsers) {
         this.parsersByPrefix = parsers.stream().collect(Collectors.toUnmodifiableMap(
             LineParser::prefix,
@@ -45,7 +44,6 @@ public class ParserRegistry {
             log.warn("Skipping line with unknown prefix '{}': {}", prefix, line);
             return Optional.empty();
         }
-        // Optional<T> não é covariante; widening explícito para Optional<DataRecord>.
         return parser.parse(line).map(DataRecord.class::cast);
     }
 }

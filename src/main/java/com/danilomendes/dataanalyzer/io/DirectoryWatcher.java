@@ -18,14 +18,12 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 
 /**
- * Bootstrap e monitoramento do diretório de entrada. Escolhemos {@link ApplicationRunner} + {@code @PreDestroy}
- * em vez de {@code SmartLifecycle} por simplicidade (critério do desafio): o desligamento ordenado já vem de
- * graça pela ordem de destruição de beans — este watcher depende do {@link FileTaskSubmitter}, então é
- * destruído antes dele (para de aceitar eventos) e só então o pool é drenado.
+ * Bootstrap e monitoramento do diretório de entrada via {@link ApplicationRunner} + {@code @PreDestroy}
+ * (em vez de {@code SmartLifecycle}): o desligamento ordenado vem da ordem de destruição de beans — o watcher
+ * depende do {@link FileTaskSubmitter}, logo é destruído antes dele e só então o pool é drenado.
  *
- * <p>Ordem anti-corrida na subida: o {@link WatchService} é registrado ANTES da varredura inicial. Um arquivo
- * que caia entre o registro e a varredura gera evento e não se perde; a deduplicação do submitter impede que
- * ele seja processado duas vezes (uma pela varredura, outra pelo evento).
+ * <p>O {@link WatchService} é registrado ANTES da varredura inicial: um arquivo que caia entre os dois passos
+ * gera evento e não se perde; a deduplicação do submitter evita processá-lo duas vezes.
  */
 @Component
 public class DirectoryWatcher implements ApplicationRunner {
@@ -60,7 +58,6 @@ public class DirectoryWatcher implements ApplicationRunner {
         Files.createDirectories(properties.outputDir());
 
         watchService = inputDir.getFileSystem().newWatchService();
-        // Registrar ANTES da varredura: fecha a janela de corrida entre subida e watcher (ver Javadoc da classe).
         inputDir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);
         initialScanner.scan();
 
@@ -80,10 +77,8 @@ public class DirectoryWatcher implements ApplicationRunner {
             try {
                 key = watchService.take();
             } catch (ClosedWatchServiceException e) {
-                // Fechamento normal: stop() fecha o WatchService no shutdown, o take() lança e o loop encerra.
                 return;
             } catch (InterruptedException e) {
-                // Interrupção externa: propaga o status e sai. Só aqui re-interrompemos a thread.
                 Thread.currentThread().interrupt();
                 return;
             }
@@ -104,7 +99,6 @@ public class DirectoryWatcher implements ApplicationRunner {
         }
     }
 
-    // Package-private para permitir teste direto do despacho de eventos (OVERFLOW → varredura; filtro de entrada).
     void handleEvent(WatchEvent<?> event) {
         if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
             log.warn("Watch OVERFLOW: eventos podem ter sido perdidos, reexecutando a varredura completa");
