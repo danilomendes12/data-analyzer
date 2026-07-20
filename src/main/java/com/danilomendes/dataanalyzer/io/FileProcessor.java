@@ -6,11 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.stream.Stream;
 
 /**
  * Processa um arquivo em passada única, com um {@link DataAnalyzer} novo por arquivo (estado isolado).
@@ -31,8 +34,8 @@ public class FileProcessor {
 
     public void process(Path path) {
         DataAnalyzer analyzer = new DataAnalyzer();
-        try (Stream<String> lines = Files.lines(path, StandardCharsets.UTF_8)) {
-            lines.forEach(line -> registry.parse(line).ifPresent(analyzer::accept));
+        try (BufferedReader reader = newLenientUtf8Reader(path)) {
+            reader.lines().forEach(line -> registry.parse(line).ifPresent(analyzer::accept));
             reportWriter.write(path, analyzer.summarize());
             log.info("Arquivo processado: {}", path.getFileName());
         } catch (IOException e) {
@@ -40,5 +43,17 @@ public class FileProcessor {
         } catch (RuntimeException e) {
             log.error("Erro inesperado ao processar {}", path, e);
         }
+    }
+
+    // UTF-8 tolerante: bytes inválidos (ex.: um .dat legado em CP1252/ISO-8859-1, onde 'ç' é o byte 0xE7)
+    // viram U+FFFD em vez de estourar UncheckedIOException no meio do stream. A linha corrompida perde o
+    // delimitador e cai no mesmo contrato de "linha malformada" — logada e ignorada. Sem isso, um único
+    // byte legado tornaria o arquivo inteiro um "poison file", retentado a cada subida sem nunca ter
+    // sucesso. O CharsetDecoder não é thread-safe: um novo por chamada.
+    private static BufferedReader newLenientUtf8Reader(Path path) throws IOException {
+        CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPLACE)
+            .onUnmappableCharacter(CodingErrorAction.REPLACE);
+        return new BufferedReader(new InputStreamReader(Files.newInputStream(path), decoder));
     }
 }

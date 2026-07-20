@@ -117,7 +117,11 @@ granularidade de timestamp e a cópias que preservam mtime). A existência do `.
 
 ### Domínio, parsing e análise
 
-- **Charset UTF-8:** o delimitador `ç` (U+00E7) exige ler os `.dat` explicitamente como **UTF-8**.
+- **Charset UTF-8 tolerante:** o delimitador `ç` (U+00E7) exige ler os `.dat` como **UTF-8**; a
+  decodificação usa `CodingErrorAction.REPLACE`, então um byte inválido (um `.dat` legado em CP1252, onde
+  `ç` é `0xE7`) vira U+FFFD e a linha cai no contrato de "malformada". Sem isso, um único byte legado
+  estouraria no meio do stream e tornaria o arquivo um *poison file*, retentado a cada subida sem nunca
+  gerar `.done.dat`.
 - **`BigDecimal` nos valores monetários** (não `double`): o desempate da venda mais cara é por igualdade
   exata de valor, que `double` não garante.
 - **`sealed interface DataRecord permits Seller, Customer, Sale`:** tipo fechado dos registros de topo

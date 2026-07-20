@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,6 +48,13 @@ class FileProcessorTest {
         return file;
     }
 
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] result = new byte[a.length + b.length];
+        System.arraycopy(a, 0, result, 0, a.length);
+        System.arraycopy(b, 0, result, a.length, b.length);
+        return result;
+    }
+
     @Test
     void aggregatesValidLinesAndSkipsTheInvalidOneInTheMiddle() throws IOException {
         Path file = writeDat("vendas.dat",
@@ -72,6 +80,26 @@ class FileProcessorTest {
         Path file = writeDat("vendas.dat", "001ç111çPedroç1000");
 
         assertThatCode(() -> processor.process(file)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void processesValidLinesAndSkipsALegacyEncodedLineWithoutPoisoning() throws IOException {
+        // Um .dat legado (CP1252/ISO-8859-1) codifica 'ç' como o byte 0xE7, inválido em UTF-8. Antes, isso
+        // estourava UncheckedIOException no meio do stream e o arquivo virava "poison file" — nunca gerava
+        // .done.dat e era retentado a cada subida. Agora o byte inválido vira U+FFFD, a linha perde o
+        // delimitador e é descartada como malformada; as linhas UTF-8 válidas seguem processadas.
+        byte[] validUtf8 = "001ç111çPedroç1000\n".getBytes(StandardCharsets.UTF_8);
+        byte[] legacyCp1252 = "002ç222çJoseçRural\n".getBytes(Charset.forName("windows-1252"));
+        Path file = inputDir.resolve("legado.dat");
+        Files.write(file, concat(validUtf8, legacyCp1252));
+
+        assertThatCode(() -> processor.process(file)).doesNotThrowAnyException();
+
+        ArgumentCaptor<Report> captor = ArgumentCaptor.forClass(Report.class);
+        verify(reportWriter).write(eq(file), captor.capture()); // .done.dat é escrito: não é poison file
+        Report report = captor.getValue();
+        assertThat(report.sellerCount()).isEqualTo(1);   // linha UTF-8 válida processada
+        assertThat(report.customerCount()).isEqualTo(0); // linha legada descartada como malformada
     }
 
     @Test
