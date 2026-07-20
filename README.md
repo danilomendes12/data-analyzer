@@ -230,20 +230,29 @@ Assumidas na fase de análise, sujeitas a confirmação com o avaliador:
 
 ## Uso de IA
 
-Este projeto usou assistência de IA (Claude) em dois momentos, sempre com a decisão final e a revisão minhas.
+Este projeto usou assistência de IA (Claude) em três estágios, sempre com a decisão final e a validação minhas.
 
-**Planejamento.** A IA acelerou o desenho da solução e ajudou a mapear as alternativas de controle de reprocessamento
-com seus trade-offs (reprocessar sempre, mover arquivos, estado dedicado, comparar `lastModified`). A escolha
-pela Opção B (`.done.dat` como registro de "processado", entrada tratada como imutável) foi minha: a IA
-levantou o leque de opções, não a decisão.
+**1. Planejamento.** A partir das especificações do desafio e da arquitetura que desenhei, um agente num
+Claude Project transformou a solução num **plano de desenvolvimento dividido em 6 etapas**. A IA acelerou o
+desenho e ajudou a mapear alternativas com seus trade-offs (ex.: controle de reprocessamento — reprocessar
+sempre, mover arquivos, estado dedicado, comparar `lastModified`); as decisões de arquitetura e de negócio —
+Opção B (`.done.dat` como registro de "processado", entrada imutável), escrita atômica, modelo de
+concorrência, regras do relatório — foram minhas. A IA levantou o leque de opções, não a escolha.
 
-**Documentação e revisão final.** A IA revisou o código em busca de código morto, imports e dependências sem
-uso (nada encontrado no `main/`), extraiu o helper de teste `IntegrationTestFiles` a partir da duplicação
-que havia entre as classes de integração e redigiu este README seguindo a estrutura que defini no plano.
+**2. Execução.** Cada uma das 6 etapas foi executada de forma iterativa, num ciclo fechado:
+1. o agente do Claude Project gera o prompt da etapa;
+2. o Claude Code gera o código a partir dele;
+3. eu **valido** — leitura e entendimento do código + execução de testes manuais — **antes do commit**;
+4. após o push da etapa, envio o link do repositório de volta ao agente do Claude Project, que **valida a
+   etapa entregue** e produz o prompt da etapa seguinte.
 
-**Como revisei.** Todo código sugerido passou por `mvn verify` (build + suíte + gate de cobertura de 90%) e
-por leitura linha a linha antes do commit. As decisões de negócio e de arquitetura — regras do relatório,
-Opção B, escrita atômica, modelo de concorrência — são minhas; a IA as descreveu, não as escolheu.
+Nenhum código entrou sem passar pela minha leitura linha a linha e por `mvn verify` (build + suíte + gate de
+cobertura de 90%).
+
+**3. Revisão.** Concluídas as etapas de desenvolvimento: **execução manual** do projeto exercitando casos de
+borda (com massa de testes `.dat` gerada pela IA) e redação deste README **pela IA, revisado por mim**. A IA
+também fez uma varredura de código morto / imports / dependências sem uso (nada encontrado no `main/`) e
+extraiu o helper de teste `IntegrationTestFiles` da duplicação entre as classes de integração.
 
 **Onde divergi das sugestões.** Mantive de propósito os acessores de domínio não lidos (`SaleItem.id()`,
 campos de `Customer`/`Seller`) que uma varredura ingênua de "código morto" removeria: eles modelam fielmente
