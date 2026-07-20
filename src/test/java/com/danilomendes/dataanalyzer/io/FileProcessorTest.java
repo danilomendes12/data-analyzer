@@ -73,4 +73,14 @@ class FileProcessorTest {
 
         assertThatCode(() -> processor.process(file)).doesNotThrowAnyException();
     }
+
+    @Test
+    void doesNotPropagateWhenWriterThrowsRuntimeException() throws IOException {
+        // Ramo catch(RuntimeException): qualquer falha inesperada (não-I/O) é contida, nunca derruba a
+        // thread do pool. Cobre também a UncheckedIOException que o Files.lines pode lançar tardiamente.
+        doThrow(new RuntimeException("falha inesperada")).when(reportWriter).write(any(), any());
+        Path file = writeDat("vendas.dat", "001ç111çPedroç1000");
+
+        assertThatCode(() -> processor.process(file)).doesNotThrowAnyException();
+    }
 }

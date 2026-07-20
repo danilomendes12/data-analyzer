@@ -42,7 +42,7 @@ processados (varredura inicial). A aplicação segue viva monitorando o diretór
 mvn verify
 ```
 
-Compila, roda a suíte de testes e falha se a cobertura de linhas cair abaixo de 80% (gate do JaCoCo).
+Compila, roda a suíte de testes e falha se a cobertura de linhas cair abaixo de 90% (gate do JaCoCo).
 
 > **Nota (JDK 26):** o JaCoCo 0.8.13 ainda não gera o relatório de cobertura sob o JDK 26, então o
 > `verify` quebra nessa versão. O código roda em 17+; a limitação é só do agente de cobertura no `verify`.
@@ -232,8 +232,7 @@ Assumidas na fase de análise, sujeitas a confirmação com o avaliador:
 
 Este projeto usou assistência de IA (Claude) em dois momentos, sempre com a decisão final e a revisão minhas.
 
-**Planejamento.** A IA acelerou o desenho da solução — esboço da arquitetura, redação do plano de
-desenvolvimento e diagrama no Excalidraw — e ajudou a mapear as alternativas de controle de reprocessamento
+**Planejamento.** A IA acelerou o desenho da solução e ajudou a mapear as alternativas de controle de reprocessamento
 com seus trade-offs (reprocessar sempre, mover arquivos, estado dedicado, comparar `lastModified`). A escolha
 pela Opção B (`.done.dat` como registro de "processado", entrada tratada como imutável) foi minha: a IA
 levantou o leque de opções, não a decisão.
@@ -242,7 +241,7 @@ levantou o leque de opções, não a decisão.
 uso (nada encontrado no `main/`), extraiu o helper de teste `IntegrationTestFiles` a partir da duplicação
 que havia entre as classes de integração e redigiu este README seguindo a estrutura que defini no plano.
 
-**Como revisei.** Todo código sugerido passou por `mvn verify` (build + suíte + gate de cobertura de 80%) e
+**Como revisei.** Todo código sugerido passou por `mvn verify` (build + suíte + gate de cobertura de 90%) e
 por leitura linha a linha antes do commit. As decisões de negócio e de arquitetura — regras do relatório,
 Opção B, escrita atômica, modelo de concorrência — são minhas; a IA as descreveu, não as escolheu.
 

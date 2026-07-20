@@ -51,4 +51,18 @@ class InitialScannerTest {
 
         verifyNoInteractions(submitter);
     }
+
+    @Test
+    void logsAndSwallowsWhenInputDirDoesNotExist() {
+        // Files.list lança IOException num diretório inexistente: a varredura loga e contém a falha,
+        // nunca propaga (senão derrubaria o boot ou o tratamento de OVERFLOW). Nada é submetido.
+        AppProperties missing = new AppProperties(inputDir.resolve("nao-existe"), outputDir);
+        OutputPathResolver resolver = new OutputPathResolver(missing);
+        InitialScanner scannerOnMissingDir =
+            new InitialScanner(missing, resolver, new ProcessedFileChecker(resolver), submitter);
+
+        scannerOnMissingDir.scan();
+
+        verifyNoInteractions(submitter);
+    }
 }

@@ -13,6 +13,7 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,6 +63,24 @@ class FileTaskSubmitterTest {
         releaseProcessing.countDown();
 
         verify(processor, times(1)).process(key);
+    }
+
+    @Test
+    void doesNotProcessAnUnstableFile() {
+        // Arquivo ainda em escrita (isStable == false): a tarefa desiste e nunca chama o processor.
+        // Cobre o ramo de instabilidade do runTask — o path é recuperado na próxima varredura.
+        when(stableFileDetector.isStable(any())).thenReturn(false);
+        Path path = Path.of("em-escrita.dat");
+        Path key = path.toAbsolutePath().normalize();
+
+        submitter.submit(path);
+
+        // O inFlight é liberado no finally mesmo sem processar: uma resubmissão volta a ser aceita.
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> {
+            submitter.submit(path);
+            verify(stableFileDetector, times(2)).isStable(key);
+        });
+        verify(processor, never()).process(any());
     }
 
     @Test

@@ -29,4 +29,18 @@ class StableFileDetectorTest {
     void reportsUnstableForAMissingFile() {
         assertThat(detector.isStable(dir.resolve("ausente.dat"))).isFalse();
     }
+
+    @Test
+    void reportsUnstableWhenInterruptedDuringPolling() throws IOException {
+        Path file = dir.resolve("vendas.dat");
+        Files.writeString(file, "conteúdo", StandardCharsets.UTF_8);
+        // Interromper a thread antes da primeira espera: a 1ª leitura (tamanho != -1) exige mais uma
+        // amostra, e o Thread.sleep entre amostras lança InterruptedException imediatamente. O detector
+        // preserva o status de interrupção e desiste (retorna false), sem processar arquivo pela metade.
+        Thread.currentThread().interrupt();
+
+        assertThat(detector.isStable(file)).isFalse();
+        // O status foi repropagado pelo sleep(); consome-o aqui para não vazar aos próximos testes.
+        assertThat(Thread.interrupted()).isTrue();
+    }
 }
