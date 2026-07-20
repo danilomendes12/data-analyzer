@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -42,6 +43,12 @@ class DirectoryWatcherEventTest {
         submitter = mock(FileTaskSubmitter.class);
         watcher = new DirectoryWatcher(properties, initialScanner, checker, submitter,
             new OutputPathResolver(properties));
+    }
+
+    @Test
+    void stopIsANoOpWhenNeverStarted() {
+        // stop() sem run(): watchService e watchThread são null; os ramos de guarda evitam NPE.
+        assertThatCode(() -> watcher.stop()).doesNotThrowAnyException();
     }
 
     @Test

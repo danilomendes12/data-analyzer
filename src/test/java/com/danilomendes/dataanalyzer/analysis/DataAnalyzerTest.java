@@ -67,6 +67,18 @@ class DataAnalyzerTest {
     }
 
     @Test
+    void tieWithLargerIdDoesNotReplaceTheMostExpensiveSale() {
+        // Empate de valor (200) em que a segunda venda tem ID MAIOR (8 > 3): não deve substituir — o
+        // desempate mantém o menor ID. Cobre o ramo "id não é menor" do critério da venda mais cara.
+        feed(
+            sale(3, "Pedro", new SaleItem(1L, 1, new BigDecimal("200"))),
+            sale(8, "Paulo", new SaleItem(1L, 1, new BigDecimal("200")))
+        );
+
+        assertThat(analyzer.summarize().mostExpensiveSaleId()).contains(3L);
+    }
+
+    @Test
     void worstSellerIsRegisteredSellerWithNoSalesAtVolumeZero() {
         feed(
             seller("Pedro", "111"),

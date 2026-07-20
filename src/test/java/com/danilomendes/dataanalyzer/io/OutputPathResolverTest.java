@@ -23,4 +23,10 @@ class OutputPathResolverTest {
         assertThat(resolver.outputPathFor(Path.of("/data/in/vendas")))
             .isEqualTo(Path.of("/data/out/vendas.done.dat"));
     }
+
+    @Test
+    void isInputFileIsFalseForANonRegularFile() {
+        // Caminho inexistente: isRegularFile é false e o curto-circuito nem chega a olhar a extensão.
+        assertThat(resolver.isInputFile(Path.of("/data/in/nao-existe.dat"))).isFalse();
+    }
 }

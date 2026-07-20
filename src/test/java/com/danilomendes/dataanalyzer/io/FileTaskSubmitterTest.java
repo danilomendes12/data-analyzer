@@ -84,6 +84,28 @@ class FileTaskSubmitterTest {
     }
 
     @Test
+    void reinterruptsAndForcesShutdownWhenInterruptedWhileDraining() throws InterruptedException {
+        // Com uma tarefa ainda em execução, awaitTermination bloqueia; interrompendo a thread nesse
+        // momento ele lança InterruptedException → o pool é forçado com shutdownNow e o status é
+        // repropagado (nunca engolido). Sem a tarefa presa o pool encerraria na hora e o ramo não rodaria.
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch block = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            started.countDown();
+            block.await();
+            return null;
+        }).when(processor).process(any());
+        submitter.submit(Path.of("presa.dat"));
+        assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
+
+        Thread.currentThread().interrupt();
+        submitter.shutdown();
+
+        assertThat(Thread.interrupted()).isTrue(); // consome o status para não vazar aos próximos testes
+        block.countDown();
+    }
+
+    @Test
     void allowsResubmissionOfSamePathAfterItFinishes() {
         Path path = Path.of("vendas.dat");
         Path key = path.toAbsolutePath().normalize();
